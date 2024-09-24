@@ -1,0 +1,25 @@
+{
+  "folders": [],
+  "geojson": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "48ffa134-69ee-4317-bee4-5cb5e357d706",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -122.0822035425683,
+            37.42228990140251,
+            0
+          ]
+        },
+        "properties": {
+          "name": "Simple placemark",
+          "description": "Attached to the ground. Intelligently places itself \n       at the height of the underlying terrain.",
+          "folder_id": null
+        }
+      }
+    ]
+  }
+}
