@@ -1,7 +1,6 @@
-import { Feature, GeoJsonProperties, Point, LineString, Polygon, Geometry, GeometryCollection } from 'geojson';
+import { Feature, GeoJsonProperties, Point, LineString, Polygon, Geometry } from 'geojson';
 import { DOMParser } from 'xmldom';
-const crypto = require('crypto');
-
+import crypto from 'crypto';
 export interface KmlFolder {
     folder_id: string;
     name: string;
@@ -232,7 +231,14 @@ export class KmlToGeojson {
         return extended_data_obj;
     }
 
-    private readonly parsePlacemark = (node: Element, styles: any[], style_maps: any[], schemas: any[], folder_id: string | null) => {
+    private readonly parsePlacemark = (
+        node: Element,
+        styles: any[],
+        style_maps: any[],
+        schemas: any[],
+        folder_id: string | null,
+        feature_uuid_map: (e: Element) => string
+    ) => {
         const name_node = this.get1(node, 'name');
         const description_node = this.get1(node, 'description');
         const style_url_node = this.get1(node, 'styleUrl');
@@ -309,9 +315,11 @@ export class KmlToGeojson {
             })
         }
 
+        const id = feature_uuid_map(node);
+
         return {
             type: "Feature",
-            id: crypto.randomUUID(),
+            id,
             geometry,
             properties,
         };
@@ -359,14 +367,15 @@ export class KmlToGeojson {
         schemas: any[],
         folders: any[] = [],
         placemarks: any[] = [],
-        level = 0
+        level = 0,
+        feature_uuid_map: (e: Element) => string
     ) => {
 
         const node_name = node.nodeName;
 
         // Parse current node
         if (node_name === 'Placemark') {
-            const placemark = this.parsePlacemark(node, styles, style_maps, schemas, folder_id);
+            const placemark = this.parsePlacemark(node, styles, style_maps, schemas, folder_id, feature_uuid_map);
             if (placemark) {
                 placemarks.push(placemark);
             }
@@ -382,8 +391,7 @@ export class KmlToGeojson {
         if (node.childNodes) {
             for (let i = 0; i < node.childNodes.length; i++) {
                 const child_node = node.childNodes[i];
-                this.parseNode(child_node as Element, folder_id, styles, style_maps, schemas, folders, placemarks, level + 1);
-
+                this.parseNode(child_node as Element, folder_id, styles, style_maps, schemas, folders, placemarks, level + 1, feature_uuid_map);
             }
         }
 
@@ -397,14 +405,15 @@ export class KmlToGeojson {
         schemas: any[],
         on_folder: (folder: KmlFolder) => (any | void | Promise<any> | Promise<void>),
         on_geometry: (geometry: KmlFeature<any>) => (any | void | Promise<any> | Promise<void>),
-        level = 0
+        level = 0,
+        feature_uuid_map: (e: Element) => string
     ) => {
 
         const node_name = node.nodeName;
 
         // Parse current node
         if (node_name === 'Placemark') {
-            const placemark = this.parsePlacemark(node, styles, style_maps, schemas, folder_id);
+            const placemark = this.parsePlacemark(node, styles, style_maps, schemas, folder_id, feature_uuid_map);
             await on_geometry(placemark as KmlFeature<any>);
         }
         else if (node_name === 'Folder') {
@@ -418,7 +427,7 @@ export class KmlToGeojson {
         if (node.childNodes) {
             for (let i = 0; i < node.childNodes.length; i++) {
                 const child_node = node.childNodes[i];
-                await this.streamParseNode(child_node as Element, folder_id, styles, style_maps, schemas, on_folder, on_geometry, level + 1);
+                await this.streamParseNode(child_node as Element, folder_id, styles, style_maps, schemas, on_folder, on_geometry, level + 1, feature_uuid_map);
 
             }
         }
@@ -603,9 +612,12 @@ export class KmlToGeojson {
         return schemas;
     }
 
-    public readonly parse = <T extends GeoJsonProperties = GeoJsonProperties>(kml_content: string): {
-        folders: KmlFolder[],
-        geojson: KmlGeojson
+    public readonly parse = <T extends GeoJsonProperties = GeoJsonProperties>(
+        kml_content: string,
+        feature_uuid_map: (e: Element) => string = (_) => crypto.randomUUID()
+    ): {
+        folders: KmlFolder[];
+        geojson: KmlGeojson;
     } => {
         const folders: any[] = [];
         const placemarks: any[] = [];
@@ -617,7 +629,7 @@ export class KmlToGeojson {
 
         const schemas = this.parseSchemas(kml_node);
 
-        this.parseNode(kml_node, null, styles, style_maps, schemas, folders, placemarks);
+        this.parseNode(kml_node, null, styles, style_maps, schemas, folders, placemarks, 0, feature_uuid_map);
 
         const geojson: KmlGeojson<T> = {
             type: 'FeatureCollection',
@@ -630,7 +642,9 @@ export class KmlToGeojson {
     public readonly streamParse = async <T extends GeoJsonProperties = GeoJsonProperties>(
         kml_content: string,
         on_folder: (folder: KmlFolder) => (any | void | Promise<any> | Promise<void>),
-        on_geometry: (geometry: KmlFeature<T>) => (any | void | Promise<any> | Promise<void>)) => {
+        on_geometry: (geometry: KmlFeature<T>) => (any | void | Promise<any> | Promise<void>),
+        feature_uuid_map: (e: Element) => string = (_) => crypto.randomUUID()
+    ) => {
 
         const dom = new DOMParser().parseFromString(kml_content);
         const kml_node = this.get1(dom as any as Element, 'kml')!;
@@ -639,6 +653,6 @@ export class KmlToGeojson {
 
         const schemas = this.parseSchemas(kml_node);
 
-        await this.streamParseNode(kml_node, null, styles, style_maps, schemas, on_folder, on_geometry);
+        await this.streamParseNode(kml_node, null, styles, style_maps, schemas, on_folder, on_geometry, 0, feature_uuid_map);
     }
 }
