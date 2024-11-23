@@ -56,10 +56,16 @@ export type KmlPolyFeature<P = GeoJsonProperties> = Omit<
   "bbox"
 >;
 
+export type KmlGeoCollFeature<P = GeoJsonProperties> = Omit<
+  Feature<Geometry, P>,
+  "bbox"
+>;
+
 export type KmlFeature<P = GeoJsonProperties> =
   | KmlPointFeature<P>
   | KmlLineFeature<P>
-  | KmlPolyFeature<P>;
+  | KmlPolyFeature<P>
+  | KmlGeoCollFeature<P>;
 
 export interface KmlGeojson<P = GeoJsonProperties> {
   type: "FeatureCollection";
